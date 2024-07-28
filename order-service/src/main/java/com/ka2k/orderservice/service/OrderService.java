@@ -25,7 +25,8 @@ import java.util.UUID;
 @Transactional
 @RequiredArgsConstructor
 public class OrderService {
-    private final WebClient webClient;
+    @Autowired
+    private final WebClient.Builder webClientBuilder;
     private final OrderRepository orderRepository;
 
     public void placeOrder(OrderRequest orderRequest) {
@@ -41,8 +42,8 @@ public class OrderService {
                 .map(OrderLineItems::getSkuCode)
                 .toList();
 
-        InventoryResponse[] result = webClient.get()
-                .uri("http://localhost:3004/api/inventory",uriBuilder -> uriBuilder.queryParam("skuCode",skuCodes).build())
+        InventoryResponse[] result = webClientBuilder.build().get()
+                .uri("http://inventory-service/api/inventory",uriBuilder -> uriBuilder.queryParam("skuCode",skuCodes).build())
                 .retrieve()
                 .bodyToMono(InventoryResponse[].class)
                 .block();
@@ -51,12 +52,14 @@ public class OrderService {
 
 
         if(allProductInStock){
-            orderRepository.save(order);
+            try {
+                orderRepository.save(order);
+            }catch (Exception e){
+                throw e;
+            }
         }else{
             throw new IllegalArgumentException("Product is not stock, please try again");
         }
-
-        orderRepository.save(order);
     }
 
     private OrderLineItems mapToDto(OrderLineItemsDto o) {
